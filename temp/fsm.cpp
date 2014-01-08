@@ -24,7 +24,9 @@ int state = INITIAL;  // state variable controls state machine
 void  setup()
 {
 SerialUSB.begin();    // For Debug
-Serial2.begin(57600);     // Xbee Pro
+
+pinMode(BOARD_BUTTON_PIN, INPUT_PULLDOWN);
+Serial2.begin(9600);     // Xbee Pro
 
 pinMode(LASER_SENSOR,INPUT);
 pinMode(TEST_SWITCH,INPUT);
@@ -40,6 +42,13 @@ Serial2.attachInterrupt(serialInterrupt);
 
 void  loop()
 {
+int buttonState = digitalRead(BOARD_BUTTON_PIN);
+static int lastState = LOW;
+
+  if(buttonState==HIGH && buttonState!=lastState){ //if button is pushed, means 3.3V(HIGH) is connected to BOARD_BUTTON_PIN
+    if(state==FINISHED){state=INITIAL;}else{state++;}
+    lastState = buttonState;
+  }
 
 //if(state != INITIAL && digitalRead(LASER_SENSOR)==LOW) // If we're in a running state and the system power switch is turned off, we should stop
 //  {
