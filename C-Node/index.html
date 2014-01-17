@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.css"
+        />
+        <script src="http://code.jquery.com/jquery-1.9.1.min.js">
+                
+        </script>
+        <script src="http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.js">
+                
+        </script>
+        <script src="/socket.io/socket.io.js">
+                
+        </script>
+        <script>
+                        $(document).ready(function()
+                {
+                    $("#d_sync").click(function()
+                    {
+                        // 변수를 선언합니다.
+                        var socket = io.connect();
+                        socket.emit('device_sync', {
+                            now: 'device_sync'
+                        });
+                        // 소켓 이벤트를 연결합니다.
+                        socket.on('status_receive', function(data)
+                        {
+                            // 변수를 선언합니다.
+                            var device = data[0].iddevice;
+                            var status = data[0].status;
+
+
+                            // 문서 객체를 추가합니다.
+                            var output = '';
+                            output += '<h3>Device: ' + device + '</h3>';
+                            //                    output += '<h3>Status: ' + age + '</h3>';
+                            //                   output += '<h3>Gender: ' + gender + '</h3>';
+                            //                   output += '<h3>Type: ' + type + '</h3>';
+                            output += '<p>Status : ' + status + '</p>';
+                            $('<li></li>').append(output).prependTo('#status_listview');
+
+                            // 문서 객체 개수 제한합니다.
+                            var content = $('#content');
+                            if (content.children().length > 7)
+                            {
+                                content.children().last().remove();
+                            }
+
+                            // 리스트뷰를 새로고침합니다.
+                            $('#status_listview').listview('refresh');
+                        });
+                    });
+
+                    $("#d_reset").click(function()
+                    {
+                        // 변수를 선언합니다.
+                        var socket = io.connect();
+                        socket.emit('device_reset', {
+                            now: 'device_reset'
+                        });
+                        // 소켓 이벤트를 연결합니다.
+                    });
+
+
+                    $("#drill_set").click(function()
+                    {
+                        // 변수를 선언합니다.
+                        var socket = io.connect();
+                        socket.emit('drill_set', {
+                            now: 'drill_set'
+                        });
+                        // 소켓 이벤트를 연결합니다.
+                    });
+
+                    $("#setdrill").click(function()
+                    {
+                        // 변수를 선언합니다.
+                        var socket = io.connect();
+                        socket.emit('drill_set', {
+                            now: 'drill_set'
+                        });
+                        // 소켓 이벤트를 연결합니다.
+                        socket.on('drill_receive', function(data)
+                        {
+                            // 변수를 선언합니다.
+                            var drill = data.device_id;
+                            //var  = data.device_status;
+                            // 문서 객체를 추가합니다.
+                            var output = '';
+                            output += '<h3>Drill Name: ' + name + '</h3>';
+                            //                    output += '<h3>Status: ' + age + '</h3>';
+                            //                   output += '<h3>Gender: ' + gender + '</h3>';
+                            //                   output += '<h3>Type: ' + type + '</h3>';
+                            output += '<p>Status : ' + status + '</p>';
+                            $('<li></li>').append(output).prependTo('#drill_listview');
+
+                            // 문서 객체 개수 제한합니다.
+                            var content = $('#content');
+                            if (content.children().length > 7)
+                            {
+                                content.children().last().remove();
+                            }
+
+                            // 리스트뷰를 새로고침합니다.
+                            $('#status_listview').listview('refresh');
+                        });
+                    });
+                });
+        </script>
+    </head>
+    <body>
+        <!-- 아이디 등록 페이지 -->
+        <div data-role="page">
+            <div data-role="header">
+                <h1>
+                    Welcome!
+                </h1>
+            </div>
+            <ul data-role="content">
+                <li>
+                    <a href="./enroll#device" data-role="button">
+                        Enroll Device
+                    </a>
+                </li>
+                <li>
+                    <a href="./enroll#trainee" data-role="button">
+                        Enroll Trainee
+                    </a>
+                </li>
+                <li>
+                    <a href="#" id="d_reset" data-role="button">
+                        Device Reset
+                    </a>
+                </li>
+                <li>
+                    <a href="#sync" id="d_sync" data-role="button">
+                        Device Sync
+                    </a>
+                </li>
+                <li>
+                    <a href="#drill" id="drill_start" data-role="button">
+                        Start Drill!
+                    </a>
+                </li>
+        </div>
+        </div>
+        <!-- 추적 페이지 -->
+        <div data-role="page" id="sync">
+            <div data-role="header">
+                <h1>
+                    Status
+                </h1>
+            </div>
+            <div data-role="content">
+                <ul id="status_listview" data-role="listview" data-inset="true">
+                </ul>
+                <li>
+                    <a href="#setdrill" id="drill_set" data-role="button">
+                        Set Drill
+                    </a>
+                </li>
+            </div>
+        </div>
+        <!-- 추적 페이지 -->
+        <div data-role="page" id="setdrill">
+            <div data-role="header">
+                <h1>
+                    Status
+                </h1>
+            </div>
+            <div data-role="content">
+                <ul id="drill_listview" data-role="listview" data-inset="true">
+                </ul>
+            </div>
+        </div>
+        <!-- 추적 페이지 -->
+        <div data-role="page" id="drill">
+            <div data-role="header">
+                <h1>
+                    Status
+                </h1>
+            </div>
+            <div data-role="content">
+                <ul id="result_listview" data-role="listview" data-inset="true">
+                </ul>
+            </div>
+        </div>
+    </body>
+
+</html>
