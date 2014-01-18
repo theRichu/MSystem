@@ -16,8 +16,8 @@ uint8_t* receivedData;
 uint8_t payloadPointer = 0;
 long previousMillis = 0;
 
-uint8_t* p_payload = payload;
-uint8_t* p_payload_short = payload_short;
+//uint8_t* p_payload = payload;
+//uint8_t* p_payload_short = payload_short;
 uint8_t option = 0;
 
 volatile int sound=0;
@@ -32,8 +32,8 @@ XBeeResponse response = XBeeResponse();
 Rx16Response rx16 = Rx16Response();
 Rx64Response rx64 = Rx64Response();
 
-Tx16Request tx = Tx16Request(0x00, payload, sizeof(payload));
 Tx16Request tx_short = Tx16Request(0x00, payload_short, sizeof(payload_short));
+Tx16Request tx = Tx16Request(0x00, payload, sizeof(payload));
 TxStatusResponse txStatus = TxStatusResponse();
 
 void  setup()
@@ -159,11 +159,19 @@ void vCommTask( void *pvParameters )
 
             payload_short={0};
             payloadPointer = 0;
-            tx.setOption(DISABLE_ACK_OPTION);
-            addByteToPayload(p_payload_short,RESP);
+         //   tx_short.setOption(DISABLE_ACK_OPTION);
+            addByteToPayload(payload_short,RESP);
             xbee.send(tx_short);
-            addByteToPayload(p_payload_short,DELAY_REQ);
-            addTimestampToPayload(p_payload_short,sens_time);
+            
+            payload_short={0};
+            payloadPointer = 0;
+         //   tx_short.setOption(DISABLE_ACK_OPTION);
+            addByteToPayload(payload_short,0x18);
+            addTimestampToPayload(payload_short,sens_time);
+#ifdef DEB
+    SerialUSB.print("***t2 :");
+    SerialUSB.println(sens_time);
+#endif
             delay(T_DELAY);
             xbee.send(tx_short);
 
@@ -175,10 +183,13 @@ void vCommTask( void *pvParameters )
         case DELAY_RESP:
           {
             payloadPointer = 0;
-            addByteToPayload(p_payload_short,DELAY_FEEDBACK);
-            addTimestampToPayload(p_payload_short,millis());
+            addByteToPayload(payload_short,DELAY_FEEDBACK);
+            addTimestampToPayload(payload_short,millis());
             xbee.send(tx_short);
-
+#ifdef DEB
+    SerialUSB.print("***t9 :");
+    SerialUSB.println(millis());
+#endif
            // d.delay_resp = sens_time;
             if(m.getState()==CONNECTED)  m.stateCalibrated();
             break;
@@ -383,34 +394,39 @@ void  loop()
 
 
 
-void M_Device::sendStoredData(int numbers){
-  //if(numbers){
-  tx.setOption(DISABLE_ACK_OPTION);
+inline void M_Device::sendStoredData(int numbers){
+  //tx.setOption(DISABLE_ACK_OPTION);
   payloadPointer = 0;
   payload={ 0  };
-  payload_short={ 0  };
 
   int num = (Queue->Count<numbers)?Queue->Count:numbers;
-  addByteToPayload(p_payload,MEASURE_OK);
-  addByteToPayload(p_payload,num);
+  addByteToPayload(payload,MEASURE_OK);
+  addByteToPayload(payload,num);
   for(int i=0;i<num;i++)
   {
     Popped = LQ_Dequeue(Queue);
-    addByteToPayload(p_payload,S_LASER + Popped->Data);
-    addTimestampToPayload(p_payload,Popped->Timestamp);
+    byte data = Popped->Data + S_LASER+5;
+    addByteToPayload(payload,data); //
+    addTimestampToPayload(payload,Popped->Timestamp);
     LQ_DestoryNode(Popped);
   }
+#ifdef DEB
+  SerialUSB.print(payload[0]);
+  SerialUSB.println(": data");
+#endif
+
   xbee.send(tx);
+
 #ifdef DEB
   SerialUSB.print(num);
   SerialUSB.println(" SEND");
 #endif
 }
 
-void addByteToPayload(uint8_t* payload_array,  byte value){
+inline void addByteToPayload(uint8_t* payload_array,  byte value){
   *(payload_array+(payloadPointer++))=value;
 }
-void addTimestampToPayload(uint8_t* payload_array, unsigned long value){
+inline void addTimestampToPayload(uint8_t* payload_array, unsigned long value){
   byte * b = (byte *) &value;
   *(payload_array+(payloadPointer++))=b[0];
   *(payload_array+(payloadPointer++))=b[1];

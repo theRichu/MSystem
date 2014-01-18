@@ -55,7 +55,7 @@
 #define DRILL_RESET                  0x31
 ///RESPONSE_CODE
 #define RESP                                   0x12
-#define DELAY_REQ                      0x13
+#define DELAY_REQ                      0x18
 #define DELAY_FEEDBACK        0x15
 #define MEASURE_START           0x41
 #define MEASURE_END                0x42
@@ -157,7 +157,7 @@ public:
   void setProtocol(int _p, int _r, int _d, int _a);
   int getProtocol();
   void delayState();
-  void sendStoredData(int numbers);
+  inline void sendStoredData(int numbers);
 
   M_Device(){
     m_times=0;
@@ -186,9 +186,9 @@ extern long previousMillis_start;
 //struct CalibTimedata d;
 void playTone(int tone, int duration);
 void flashLed(int pin, int times, int wait);
-void addByteToPayload(uint8_t* payload_array, byte value);
-void addTimestampToPayload(uint8_t* payload_array, unsigned long value);
-void addFloatToPayload(uint8_t* payload_array, float value);
+inline void addByteToPayload(uint8_t* payload_array, byte value);
+inline void addTimestampToPayload(uint8_t* payload_array, unsigned long value);
+inline void addFloatToPayload(uint8_t* payload_array, float value);
 
 #endif
 
