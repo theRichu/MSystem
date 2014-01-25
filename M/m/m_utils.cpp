@@ -81,6 +81,15 @@ void M_Device::setProtocol(int _p, int _r, int _d, int _a){
   mode.delay_time = _d; 
   mode.aftercollecting_time = _a;
 }
+
+void M_Device::setRole(int _s, int _r){
+  for(int i=0;i<SENSOR_NUM;i++){
+    if(sensors[i]==_s){
+     sensor_roles[i] = _r; 
+    }
+  }
+}
+
 void M_Device::stateReset(){
 #ifdef DEB
   SerialUSB.print(millis());
@@ -89,15 +98,17 @@ void M_Device::stateReset(){
   m_times=0;
   state=INITIAL;
 }
-void M_Device::stateAftercollecting(){
-  previousMillis_start = (int)millis();
-  state=AFTERCOLLECTING;
+
+void M_Device::stateEnd(){
 #ifdef DEB
   SerialUSB.print(millis());
-  SerialUSB.println("***AFTERCOLLECTING");
+  SerialUSB.println("***DRILL END");
 #endif
+  m_times=0;
+  state=END;
 }
-void M_Device::stateMeasuring(){
+
+void M_Device::stateMeasure(){
   state=MEASURING;
 #ifdef DEB
   SerialUSB.print(millis());
@@ -119,74 +130,81 @@ void M_Device::stateMeasuring(){
   SerialUSB.println(mode.aftercollecting_time);
 #endif
 }
+
+void M_Device::stateAftercollect(){
+  previousMillis_start = (int)millis();
+  state=AFTERCOLLECTING;
+#ifdef DEB
+  SerialUSB.print(millis());
+  SerialUSB.println("*** AFTERCOLLECTING");
+#endif
+}
+
 void M_Device::stateConnected(){
   state=CONNECTED;
 #ifdef DEB
   SerialUSB.print(millis());
-  SerialUSB.println("***CONNECTED");
+  SerialUSB.println("*** CONNECTED");
 #endif
 }
+
 void M_Device::stateCalibrated(){
   state=READY;
 #ifdef DEB
   SerialUSB.print(millis());
-  SerialUSB.println("***READY");                 
+  SerialUSB.println("*** CALIBRATED");                 
 #endif
 }
-void M_Device::delayState(){
-  previousMillis_start = (int)millis();
-  state=WAITING;
+
+void M_Device::statePause(){
+  state=PAUSE;
 #ifdef DEB
   SerialUSB.print(millis());
-  SerialUSB.println("***WAITING");
+  SerialUSB.println("*** PAUSE");                 
 #endif
 }
-int M_Device::getState(){
-  return state;
-}
-int M_Device::getProtocol(){
-  return mode.code;
-}
+
 void M_Device::stateError(){
   state=ERROR_STATE;
 #ifdef DEB
   SerialUSB.print(millis());
-  SerialUSB.println("***ERROR_STATE");
+  SerialUSB.println("*** ERROR_STATE");
 #endif
 }
-void M_Device::measuringComplete(){
+
+void M_Device::stateWait(){
+  previousMillis_start = (int)millis();
+  state=WAITING;
+#ifdef DEB
+  SerialUSB.print(millis());
+  SerialUSB.println("*** WAITING");
+#endif
+}
+
+void M_Device::stateFinish(){
   //sendStoredData(0);
   state = FINISHED;
 #ifdef DEB
   SerialUSB.print(millis());
-  SerialUSB.println("***FINISHED");
+  SerialUSB.println("*** MEASURING FINISHED");
 #endif
 }
+
+
+
+int M_Device::getState(){
+  return state;
+}
+
+int M_Device::getProtocol(){
+  return mode.code;
+}
+
 
 /************************************************
  * Utils
  *************************************************/
 
-void playTone(int tone, int duration) {
-  for (long i = 0; i < duration * 1000L; i += tone * 2) {
-    digitalWrite(PIEZO, HIGH);
-    delayMicroseconds(tone);
-    digitalWrite(PIEZO, LOW);
-    delayMicroseconds(tone);
-  }
-}
-
-void flashLed(int pin, int times, int wait) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(pin, HIGH);
-    delay(wait);
-    digitalWrite(pin, LOW);
-
-    if (i + 1 < times) {
-      delay(wait);
-    }
-  }
-}
 /*
 float readFloatFromPayload(ZBRxResponse rx, int i){
  union u_tag {

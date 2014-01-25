@@ -32,13 +32,15 @@ var MEASURE_READYD = 0x45;
 var MEASURE_RESETTED = 0x46;
 var STATUS = 0x21;
 
-var t1;
-var t2;
-var t4;
-var t6;
-var t7;
-var t9;
-var t10;
+var DEVICE_NUM=2;
+
+var t1=new Array();
+var t2=new Array();
+var t4=new Array();
+var t6=new Array();
+var t7=new Array();
+var t9=new Array();
+var t10=new Array();
 
 
   var frame_DELAY_RESP = {
@@ -69,23 +71,32 @@ serialport.on("open", function() {
   };
 
 
-  var frame_TEST_DRILL = {
+  var frame_TEST_DRILL_1 = {
     type: 0x01,
     id: 0x01,
-    destination16:"FFFF",
+    destination16:"0001",
     options: 0x01,
-    data: [ DRILL_READY, 0x40, 0x02, 0x02, 0x02 ]
+    data: [ DRILL_READY, 0x40, 0x01, 0x02, 0x02, 0x00, 0x10 ]
   };
+
+    var frame_TEST_DRILL_3 = {
+    type: 0x01,
+    id: 0x01,
+    destination16:"0003",
+    options: 0x01,
+    data: [ DRILL_READY, 0x40, 0x01, 0x02, 0x02, 0x00, 0x30 ]
+  };
+
 
   serialport.write(xbeeAPI.buildFrame(frame_RESET), function(err, res) {
   if (err) throw(err);
   else console.log ("reset");
   });
 
-
 //Sync
   setTimeout(function () {
-    t1=new Date().getTime();
+    t1[0]=new Date().getTime();
+    t1[3]=new Date().getTime();
     serialport.write(xbeeAPI.buildFrame(frame_SYNC), function(err, res) {
     if (err) throw(err);
     else     console.log("sync: "+util.inspect(res));
@@ -93,7 +104,12 @@ serialport.on("open", function() {
 }, 1000);
      
   setTimeout(function(){
-	  serialport.write(xbeeAPI.buildFrame(frame_TEST_DRILL), function(err, res) {
+	  serialport.write(xbeeAPI.buildFrame(frame_TEST_DRILL_1), function(err, res) {
+    if (err) throw(err);
+    else     console.log("test drill:"+util.inspect(res));
+   });
+
+    serialport.write(xbeeAPI.buildFrame(frame_TEST_DRILL_3), function(err, res) {
     if (err) throw(err);
     else     console.log("test drill:"+util.inspect(res));
   });
@@ -116,35 +132,33 @@ var TX16 = 0x81;
     var time_temp = new Date().getTime();
 
     if(frame.data[0]==RESP){
-      t4 = time_temp;
-      console.log("t4 : " + t4);
+      t4[frame.remote16] = time_temp;
+      console.log("t4 : " + t4[frame.remote16]);
     }else if(frame.data[0]==DELAY_REQ){
-        t7 = new Date().getTime();
-        console.log("t7 : " + t7);
+        t7[frame.remote16] = new Date().getTime();
+        console.log("t7 : " + t7[frame.remote16]);
+        frame_DELAY_RESP.destination16 = frame.remote16;
         serialport.write(xbeeAPI.buildFrame(frame_DELAY_RESP), function(err, res) {
           if (err) throw(err);
           else  console.log("DELAY_RESP: "+util.inspect(res));
         });
-
-
-      t6 = time_temp;
-      console.log("t6 : " + t6);
-  
-      t2 = Number(frame.data[1])+ Number(Number(frame.data[2])<<8) + Number(Number(frame.data[3])<<16) + Number(Number(frame.data[4])<<24);
+      t6[frame.remote16] = time_temp;
+      console.log("t6 : " + t6[frame.remote16]);
+      t2[frame.remote16] = Number(frame.data[1])+ Number(Number(frame.data[2])<<8) + Number(Number(frame.data[3])<<16) + Number(Number(frame.data[4])<<24);
       
-      console.log("t2 : " + t2);
+      console.log("t2 : " + t2[frame.remote16]);
     }else if(frame.data[0]==DELAY_FEEDBACK){
-      t10 = time_temp;
-      console.log("t10 : " + t10);
-      t9 = Number(frame.data[1])+ Number(Number(frame.data[2])<<8) + Number(Number(frame.data[3])<<16) + Number(Number(frame.data[4])<<24);
-      console.log("t9 : " + t9);
+      t10[frame.remote16] = time_temp;
+      console.log("t10 : " + t10[frame.remote16]);
+      t9[frame.remote16] = Number(frame.data[1])+ Number(Number(frame.data[2])<<8) + Number(Number(frame.data[3])<<16) + Number(Number(frame.data[4])<<24);
+      console.log("t9 : " + t9[frame.remote16]);
       //Time Sync Complete
 
-      console.log("delay(m>s) : " + (t2-t1));
-      console.log("delay(s) : " + (t6-t4-500));
-      console.log("delay(m) : " + (t7-t6));
-      console.log("delay(s>m(p)) : " + (t6-t2-500));
-      console.log("delay(s>m) : " + (t10-t9));
+      console.log("delay(m>s) : " + (t2[frame.remote16]-t1[frame.remote16]));
+      console.log("delay(s) : " + (t6[frame.remote16]-t4[frame.remote16]-500));
+      console.log("delay(m) : " + (t7[frame.remote16]-t6[frame.remote16]));
+      console.log("delay(s>m(p)) : " + (t6[frame.remote16]-t2[frame.remote16]-500));
+      console.log("delay(s>m) : " + (t10[frame.remote16]-t9[frame.remote16]));
 
 
     }else if(frame.data[0]==MEASURE_OK){

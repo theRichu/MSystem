@@ -1,177 +1,356 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.css" />
-    <script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
-    <script src="http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        $(document).ready(function () {
-            $('#enroll_trainee').click(function () {
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.css"
+        />
+        <script src="http://code.jquery.com/jquery-1.9.1.min.js">
+                        
+        </script>
+        <script src="http://code.jquery.com/mobile/1.3.1/jquery.mobile-1.3.1.min.js">
+                        
+        </script>
+        <script src="/socket.io/socket.io.js">
+                        
+        </script>
+        <script>
+        $(document).ready(function()
+        {
+            $('#enroll_trainee').click(function()
+            {
                 // 변수를 선언합니다.
                 var socket = io.connect();
 
                 socket.emit('enroll_trainee', {
-                    name: $('#textName').val(), 
-                    age: $('#textAge').val(), 
+                    name: $('#textName').val(),
+                    age: $('#textAge').val(),
                     gender: $('#textGender').val(),
-                    type: $('#textType').val()});
+                    type: $('#textType').val()
+                });
 
                 // 소켓 이벤트를 연결합니다.
-                socket.on('trainee_receive', function (data) {
+                socket.on('trainee_receive', function(data)
+                {
+                    $('#listview_trainee').listview('empty');
                     // 변수를 선언합니다.
+                    for (var i in data)
+                    {
+                        // 변수를 선언합니다.
+                        var name = data[i].name;
+                        var age = data[i].age;
+                        var gender = data[i].gender;
+                        var type = data[i].type;
 
-                    var name = data.name;
-                    var age = data.age;
-                    var gender = data.gender;
-                    var type = data.type;
+                        // 문서 객체를 추가합니다.
+                        var output = '';
+                        output += '<h3>Name: ' + name + '</h3>';
+                        output += '<h3>Age: ' + age + '</h3>';
+                        output += '<h3>Gender: ' + gender + '</h3>';
+                        output += '<h3>Type: ' + type + '</h3>';
+                        //                   output += '<p>' + data.date + '</p>';
+                        $('<li></li>').append(output).prependTo('#listview_trainee');
 
-                    // 문서 객체를 추가합니다.
-                    var output = '';
-                    output += '<h3>Name: ' + name + '</h3>';
-                    output += '<h3>Age: ' + age + '</h3>';
-                    output += '<h3>Gender: ' + gender + '</h3>';
-                    output += '<h3>Type: ' + type + '</h3>';
- //                   output += '<p>' + data.date + '</p>';
-                    $('<li></li>').append(output).prependTo('#listview_trainee');
-
-                    // 문서 객체 개수 제한합니다.
-                    var content = $('#content');
-                    if (content.children().length > 7) {
-                        content.children().last().remove();
+                        // 문서 객체 개수 제한합니다.
+                        var content = $('#content');
+                        if (content.children().length > 7)
+                        {
+                            content.children().last().remove();
+                        }
                     }
-
                     // 리스트뷰를 새로고침합니다.
                     $('#listview_trainee').listview('refresh');
                 });
             });
-            $('#enroll_device').click(function () {
+
+            $('#enroll_drill').click(function()
+            {
+                // 변수를 선언합니다.
+                var socket = io.connect();
+
+                socket.emit('enroll_drill', {
+                    name: $('#textDrillName').val()
+                });
+
+                // 소켓 이벤트를 연결합니다.
+                socket.on('drill_receive', function(data)
+                {
+                    $('#listview_drill').listview('empty');
+                    // 변수를 선언합니다.
+                    for (var i in data)
+                    {
+                        // 변수를 선언합니다.
+                        var name = data[i].name;
+
+                        // 문서 객체를 추가합니다.
+                        var output = '';
+                        output += '<h3>Name: ' + name + '</h3>';
+
+                        //                   output += '<p>' + data.date + '</p>';
+                        $('<li></li>').append(output).prependTo('#listview_drill');
+
+                        // 문서 객체 개수 제한합니다.
+                        var content = $('#content');
+                        if (content.children().length > 7)
+                        {
+                            content.children().last().remove();
+                        }
+                    }
+                    // 리스트뷰를 새로고침합니다.
+                    $('#listview_drill').listview('refresh');
+                });
+            });
+
+            $('#enroll_device').click(function()
+            {
                 // 변수를 선언합니다.
                 var socket = io.connect();
 
                 socket.emit('enroll_device', {
-                    deviceid: $('#textDid').val(), 
-                    type: $('#textDtype').val()});
+                    dest: $('#textDaddr').val(),
+                    type: $('#textDtype').val()
+                });
 
                 // 소켓 이벤트를 연결합니다.
-                socket.on('device_receive', function (data) {
+                socket.on('device_receive', function(data)
+                {
+                    $('#listview_device').listview('empty');
                     // 변수를 선언합니다.
+                    console.log(data);
+                    for (var i in data)
+                    {
+                        var dest = data[i].dest;
+                        //    var type = data[i].type;
+                        // 문서 객체를 추가합니다.
+                        var output = '';
+                        output += '<h3>dest: ' + dest + '</h3>';
+                        //     output += '<p>' + type + '</p>';
+                        $('<li></li>').append(output).prependTo('#listview_device');
 
-                    var deviceid = data.deviceid;
-                    var type = data.type;
+                        // 문서 객체 개수 제한합니다.
+                        var content = $('#content');
+                        if (content.children().length > 7)
+                        {
+                            content.children().last().remove();
+                        }
 
-                    // 문서 객체를 추가합니다.
-                    var output = '';
-                    output += '<h3>deviceid: ' + deviceid + '</h3>';
-                    output += '<p>' + type + '</p>';
-                    $('<li></li>').append(output).prependTo('#listview_Device');
-
-                    // 문서 객체 개수 제한합니다.
-                    var content = $('#content');
-                    if (content.children().length > 7) {
-                        content.children().last().remove();
                     }
-
                     // 리스트뷰를 새로고침합니다.
-                    $('#listview_Device').listview('refresh');
+                    $('#listview_device').listview('refresh');
                 });
             });
         });
-    </script>
-</head>
-<body>
-    <!-- 아이디 등록 페이지 -->
-    <div data-role="page">
-        <div data-role="header">
-            <nav data-role="navbar">
-                <ul>
-                    <li><a href="#" class="ui-btn-active">Enroll</a></li>
-                    <li><a href="#trainee" >trainee</a></li>
-                    <li><a href="#device">device</a></li>
-                </ul>
-            </nav>
-
-        </div>
-        <div data-role="content">
-            Enroll Device and Trainee
-        </div>
-    </div>
-
-
-    <!-- 추적 페이지 -->
-    <div data-role="page" id="trainee">
-        <div data-role="header">
-            <nav data-role="navbar">
-                <ul>
-                    <li><a href="#">Enroll</a></li>
-                    <li><a href="#trainee" class="ui-btn-active">trainee</a></li>
-                    <li><a href="#device">device</a></li>
-                </ul>
-            </nav>
-            <h1>Trainee</h1>
-        </div>
-        <div data-role="content">
-            <div data-role="fieldcontain">
-                <label for="textName">Name</label>
-                <input type="text" id="textName" />
-                <label for="textAge">Age</label>
-                <input type="text" id="textAge" />
-                <label for="textGender">Gender</label>
-                <input type="text" id="textGender" />
-                <label for="textType">Type</label>
-                <input type="text" id="textType" />
+        </script>
+    </head>
+    <body>
+        <!-- 아이디 등록 페이지 -->
+        <div data-role="page" id="main">
+            <div data-role="header">
+                <nav data-role="navbar">
+                    <ul>
+                        <li>
+                            <a href="#" class="ui-btn-active">
+                                Enroll
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#device">
+                                Device
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#trainee">
+                                Trainee
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#drill">
+                                Drill
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
             </div>
-            <a href="#device_result" data-role="button" id="enroll_trainee">Enroll!</a>
-        </div>
-    </div>
-
-      <!-- 추적 페이지 -->
-    <div data-role="page" id="device">
-        <div data-role="header">
-            <nav data-role="navbar">
-                <ul>
-                    <li><a href="#">Enroll</a></li>
-                    <li><a href="#trainee">trainee</a></li>
-                    <li><a href="#device" class="ui-btn-active">device</a></li>
-                </ul>
-            </nav>
-            <h1>Device</h1>
-        </div>
-        <div data-role="content">
-            <div data-role="fieldcontain">
-                <label for="textDid">DeviceID</label>
-                <input type="text" id="textDid" />
-                <label for="textDType">Type</label>
-                <input type="text" id="textDType" />
+            <div data-role="content">
+                Enroll Device and Trainee
             </div>
-            <a href="#device_result" data-role="button" id="enroll_device">Enroll!</a>
         </div>
-    </div>
 
+        <div data-role="page" id="trainee">
+            <div data-role="header">
+                <nav data-role="navbar">
+                    <ul>
+                        <li>
+                            <a href="#">
+                                Enroll
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#device">
+                                Device
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#trainee" class="ui-btn-active">
+                                Trainee
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#drill">
+                                Drill
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <h1>
+                    Trainee
+                </h1>
+            </div>
+            <div data-role="content">
+                <div data-role="fieldcontain">
+                    <label for="textName">
+                        Name
+                    </label>
+                    <input type="text" id="textName" />
+                    <label for="textAge">
+                        Age
+                    </label>
+                    <input type="text" id="textAge" />
+                    <label for="textGender">
+                        Gender
+                    </label>
+                    <input type="text" id="textGender" />
+                    <label for="textType">
+                        Type
+                    </label>
+                    <input type="text" id="textType" />
+                </div>
+                <a href="#device_result" data-role="button" id="enroll_trainee">
+                    Enroll!
+                </a>
+            </div>
+        </div>
+        
+        <div data-role="page" id="device">
+            <div data-role="header">
+                <nav data-role="navbar">
+                    <ul>
+                        <li>
+                            <a href="#">
+                                Enroll
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#device" class="ui-btn-active">
+                                Device
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#trainee">
+                                Trainee
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#drill">
+                                Drill
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <h1>
+                    Device
+                </h1>
+            </div>
+            <div data-role="content">
+                <div data-role="fieldcontain">
+                    <label for="textDaddr">
+                        Device Xbee Address
+                    </label>
+                    <input type="text" id="textDaddr" />
+                    <label for="textDType">
+                        Type
+                    </label>
+                    <input type="text" id="textDType" />
+                </div>
+                <a href="#device_result" data-role="button" id="enroll_device">
+                    Enroll!
+                </a>
+            </div>
+        </div>
+        <div data-role="page" id="drill">
+            <div data-role="header">
+                <nav data-role="navbar">
+                    <ul>
+                        <li>
+                            <a href="#">
+                                Enroll
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#device">
+                                Device
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#trainee">
+                                Trainee
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#drill" class="ui-btn-active">
+                                Drill
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <h1>
+                    Drill
+                </h1>
+            </div>
+            <div data-role="content">
+                <div data-role="fieldcontain">
+                    <label for="textDrillName">
+                        DrillName
+                    </label>
+                    <input type="text" id="textDrillName" />
+                </div>
+                <a href="#drill_result" data-role="button" id="enroll_drill">
+                    Enroll!
+                </a>
+            </div>
+        </div>
+        <div data-role="page" id="trainee_result">
+            <div data-role="header">
+                <h1>
+                    Trainee
+                </h1>
+            </div>
+            <div data-role="content">
+                <ul id="listview_trainee" data-role="listview" data-inset="true">
+                </ul>
+            </div>
+        </div>
+        <div data-role="page" id="device_result">
+            <div data-role="header">
+                <h1>
+                    Device
+                </h1>
+            </div>
+            <div data-role="content">
+                <ul id="listview_device" data-role="listview" data-inset="true">
+                </ul>
+            </div>
+        </div>
+        <div data-role="page" id="drill_result">
+            <div data-role="header">
+                <h1>
+                    Drill
+                </h1>
+            </div>
+            <div data-role="content">
+                <ul id="listview_device" data-role="listview" data-inset="true">
+                </ul>
+            </div>
+        </div>
+    </body>
 
-    <!-- 추적 페이지 -->
-    <div data-role="page" id="trainee_result">
-        <div data-role="header">
-            <h1>Trainee</h1>
-        </div>
-        <div data-role="content">
-            <ul id="listview_trainee" data-role="listview" data-inset="true">
-            
-            </ul>
-        </div>
-    </div>
-
-      <!-- 추적 페이지 -->
-    <div data-role="page" id="device_result">
-        <div data-role="header">
-            <h1>Trainee</h1>
-        </div>
-        <div data-role="content">
-            <ul id="listview_device" data-role="listview" data-inset="true">
-            
-            </ul>
-        </div>
-    </div>
-</body>
 </html>
