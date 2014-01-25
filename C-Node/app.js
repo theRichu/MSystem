@@ -88,7 +88,6 @@ xbeeAPI.on("frame_object", function (frame) {
     var resp_code = Number(frame.data[0]);
 
     console.log("Remote16 : " + frame.remote16 + "  Response : 0x" + resp_code.toString(16));
-
     switch (resp_code) {
     case RESP:
       var t4 = new Date().getTime();
@@ -103,10 +102,6 @@ xbeeAPI.on("frame_object", function (frame) {
 
 
     case DELAY_REQ:
-      //Calc delay(m->s) and delay(s)
-      //SAVE TIMESTAMP
-      //SEND DELAY_RESP
-      // console.log("got DELAY_RESP : " + frame.remote16);
       var t6 = new Date().getTime();
       frame_DELAY_RESP.destination16 = frame.remote16;
       serialport.write(xbeeAPI.buildFrame(frame_DELAY_RESP), function (err, res) {
@@ -116,26 +111,25 @@ xbeeAPI.on("frame_object", function (frame) {
       console.log("***DELAY_REQ(" + frame.remote16 + "): " + frame.data);
       var t2 = Number(Number(frame.data[1]) + Number(Number(frame.data[2]) << 8) + Number(Number(frame.data[3]) << 16) + Number(Number(frame.data[4]) << 24));
       client.query('UPDATE sync_data SET t2=?, t6=? WHERE iddrill=? AND iddevice=(SELECT iddevice FROM device WHERE dest=?)', [t2, t6, 1, frame.remote16]);
-
       break;
+
     case DELAY_FEEDBACK:
       var t10 = new Date().getTime();
       console.log("***DELAY_FEEDBACK(" + frame.remote16 + "): " + frame.data);
       var t9 = Number(Number(frame.data[1]) + Number(Number(frame.data[2]) << 8) + Number(Number(frame.data[3]) << 16) + Number(Number(frame.data[4]) << 24));
       client.query('UPDATE sync_data SET t9=?, t10=?, sync_at=now() WHERE iddrill=? AND iddevice=(SELECT iddevice FROM device WHERE dest=?)', [t9, t10, 1, frame.remote16]);
-      client.query('UPDATE device D SET offset=(SELECT ((t2-t1)-((t4-t1)/2)) FROM sync_data WHERE iddrill=? AND iddevice=D.iddevice) WHERE dest=?', [1,frame.remote16,frame.remote16]);
-          
-
-    client.query('SELECT iddrill,iddevice FROM device WHERE dest=?',[frame.remote16], function (error, data) { 
-    for (var i in data) {
-      io.sockets.emit('sync_updated', {
-              iddrill : data[i].iddrill,
-              iddevice: data[i].iddevice,
-              offset: offset
+      client.query('UPDATE device D SET offset=(SELECT ((t2-t1)-((t4-t1)/2)) FROM sync_data WHERE iddrill=? AND iddevice=D.iddevice) WHERE dest=?', [1, frame.remote16, frame.remote16]);
+      client.query('SELECT iddrill,iddevice FROM device WHERE dest=?', [frame.remote16], function (error, data) {
+        for (var i in data) {
+          io.sockets.emit('sync_updated', {
+            iddrill: data[i].iddrill,
+            iddevice: data[i].iddevice,
+            offset: offset
+          });
+        }
       });
-    }
-  });
       break;
+
     case MEASURE_START:
       //CHANGE STATUS
       console.log("***MEASURE START" + frame.data);
@@ -146,11 +140,12 @@ xbeeAPI.on("frame_object", function (frame) {
     case MEASURE_END:
       //Save DB - record
       console.log("***MEASURE END" + frame.data);
-          //Measure End, Result..
-client.query('SELECT iddrill,iddevice,sensor_type,data,(raw_timestamp - (SELECT offset FROM device WHERE iddevice=R.iddevice))AS at FROM record R WHERE iddrill=?',[1], function (error, data) {
-          io.sockets.emit('end_measure',data);
-    });
+      //Measure End, Result..
+      client.query('SELECT iddrill,iddevice,sensor_type,data,(raw_timestamp - (SELECT offset FROM device WHERE iddevice=R.iddevice))AS at FROM record R WHERE iddrill=?', [1], function (error, data) {
+        io.sockets.emit('end_measure', data);
+      });
       break;
+
     case MEASURE_OK:
       //Save DB - record
       for (i = 0; i < Number(frame.data[1]); i++) {
@@ -161,37 +156,20 @@ client.query('SELECT iddrill,iddevice,sensor_type,data,(raw_timestamp - (SELECT 
           frame.data[k] | 0xF0,
           Number(frame.data[k + 1]) + Number(Number(frame.data[k + 2]) << 8) + Number(Number(frame.data[k + 3]) << 16) + Number(Number(frame.data[k + 4]) << 24),
           frame.remote16
-          ]);
-
-    /*
-          io.sockets.emit('result_receive', {
-              dest: frame.remote16,
-              data: frame.data[k] | 0xF0,
-              sensor_type: frame.data[k] | 0xF,
-              raw_timestamp : Number(frame.data[k + 1]) + Number(Number(frame.data[k + 2]) << 8) + Number(Number(frame.data[k + 3]) << 16) + Number(Number(frame.data[k + 4]) << 24)
-          }
-        );*/
-
-/*
-        client.query('SELECT * FROM record WHERE iddrill=?', [1], function (err, data) {
-          if (err) throw (err);
-          else {
-            io.sockets.emit('result_receive',
-       {
-          iddevice: data.iddevice,
-          iddrill: data.iddrill,
-          sensor_type: data.sensor_type,
-          data: data.data,
-          time: data.raw_timestamp
-        }data
-            );*/
-          
-         // console.log(data);
+          ], function(err,res){
+                  if (err) throw (err);
+      else {
+         //   console.log(res.insertId);
+      client.query('SELECT iddrill,iddevice,sensor_type,data,(raw_timestamp - (SELECT offset FROM device WHERE iddevice=R.iddevice))AS at FROM record R WHERE idrecord=?', [res.insertId], function (error, data) {
+        io.sockets.emit('result_receive', data);
+      });
       }
-          client.query('SELECT iddrill,iddevice,sensor_type,data,(raw_timestamp - (SELECT offset FROM device WHERE iddevice=R.iddevice))AS at FROM record R WHERE iddrill=?',[1], function (error, data) {
-          io.sockets.emit('result_receive',data);
-    });
+          });
+      }
+
+
       break;
+
     case MEASURE_READYD:
       //Update Status - device
       break;
@@ -219,7 +197,7 @@ app.get('/', function (request, response) {
   });
 });
 
-
+/*
 // GET - /ShowData
 app.get('/showtrainee', function (request, response) {
   // 데이터베이스의 데이터를 제공합니다.
@@ -233,7 +211,7 @@ app.get('/showrecord', function (request, response) {
     response.send(data);
   });
 });
-
+*/
 // 웹 서버를 실행합니다.
 server.listen(52273, function () {
   console.log('Server Running at http://127.0.0.1:52273');
@@ -242,13 +220,8 @@ server.listen(52273, function () {
 // 소켓 서버를 생성 및 실행합니다.
 var io = require('socket.io').listen(server);
 io.sockets.on('connection', function (socket) {
-
-  // Enroll Trainee
   socket.on('enroll_trainee', function (data) {
-    //Insert Data
     client.query('INSERT INTO trainee(name, age, gender, type, created_time) VALUES (?, ?, ?, ?,NOW())', [data.name, data.age, data.gender, data.type]);
-
-    // receive 이벤트를 발생시킵니다.            
     io.sockets.emit('trainee_receive', {
       name: data.name,
       age: data.age,
@@ -260,10 +233,7 @@ io.sockets.on('connection', function (socket) {
   // enroll_device Event
   socket.on('enroll_device', function (data) {
     console.log("ENROLL DEVICE");
-    // 데이터를 삽입합니다.
-    client.query('INSERT INTO device(dest, status, time) VALUES (?, 0, NOW())', [data.dest]);
-
-    // receive 이벤트를 발생시킵니다.            
+    client.query('INSERT INTO device(dest, status, time) VALUES (?, 0, NOW())', [data.dest]);    
     io.sockets.emit('device_receive', {
       dest: data.dest
     });
@@ -271,10 +241,7 @@ io.sockets.on('connection', function (socket) {
 
   // Enroll Drill
   socket.on('enroll_drill', function (data) {
-    // 데이터를 삽입합니다.
-    client.query('INSERT INTO drill(name, time) VALUES (?, NOW())', [data.name]);
-
-    // receive 이벤트를 발생시킵니다.            
+    client.query('INSERT INTO drill(name, time) VALUES (?, NOW())', [data.name]);       
     io.sockets.emit('drill_receive', {
       name: data.name
     });
@@ -293,9 +260,8 @@ io.sockets.on('connection', function (socket) {
             //  console.log("SEND SYNC ");
           }
         });
-        console.log("SEND SYNC " + i + "  " + data[i].dest + "   " + t1);
         client.query('UPDATE sync_data SET t1=? WHERE iddrill=? AND iddevice=(SELECT iddevice FROM device WHERE dest=?)', [t1, 1, data[i].dest]);
-
+        console.log("***SEND SYNC " + i + "  " + data[i].dest + "   " + t1);
       }
     });
   });
@@ -314,7 +280,7 @@ io.sockets.on('connection', function (socket) {
 
         serialport.write(xbeeAPI.buildFrame(frame_TEST_DRILL), function (err, res) {
           if (err) throw (err);
-          else console.log("test drill:" + util.inspect(res));
+          else console.log("***DRILL SET:" + util.inspect(res));
         });
       }
     });
@@ -334,7 +300,7 @@ io.sockets.on('connection', function (socket) {
           }
         });
 
-        console.log("reset");
+        console.log("***RESET");
       }
     });
   });
