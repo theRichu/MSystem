@@ -21,7 +21,18 @@
 
 #define ERROR_STATE        9
 
+
 /////////////////////COMM//////////////////////////////
+#define RECORD                30
+#define SIGNAL                10
+#define SIGNAL_RESP           1
+#define SIGNAL_DELAY_REQ      2
+#define SIGNAL_DELAY_FEEDBACK 3
+#define SIGNAL_START          9
+#define SIGNAL_END            8
+#define STATUS_RESP           20
+
+
 ///Protocols
 #define  P_UNDEFINED        0x00
 #define  P_NORMAL           0x10
@@ -81,7 +92,7 @@
 
 #define BLINK_DELAY         500
 #define SENSOR_NUM          1
-#define MAX_BUFFER_NUM      32
+#define MAX_BUFFER_NUM      7
 
 #define T_DELAY             500
 #define SOUND_LENGTH        50
@@ -89,33 +100,6 @@
 #ifndef NULL
 #define NULL 0
 #endif
-
-/******************************************************************
- * Linked Queue
- ******************************************************************/
-typedef struct tagNode
-{
-  int Data;
-  unsigned long Timestamp;
-  struct tagNode* NextNode;
-}Node;
-
-typedef struct tagLinkedQueue
-{
-  Node* Front;
-  Node* Rear;
-  int Count;
-}LinkedQueue;
-
-void LQ_CreateQueue(LinkedQueue** Queue);
-void LQ_DestoryQueue(LinkedQueue* Queue);
-Node* LQ_CreateNode(int NewData, unsigned long _timestamp);
-void LQ_DestoryNode(Node* _Node);
-void LQ_Enqueue(LinkedQueue* Queue, Node* NewNode);
-Node* LQ_Dequeue(LinkedQueue* Queue);
-int LQ_IsEmpty(LinkedQueue* Queue);
-
-
 
 struct Protocol{
   int code;
@@ -127,14 +111,11 @@ struct Protocol{
 class M_Device{
 private:
   int state;// = INITIAL;  // state variable controls state machine
-
-
 public:
   int sensors[SENSOR_NUM];// = {S_LASER};
   int sensor_roles[SENSOR_NUM];
   int m_times;
-  Node* Popped;
-  LinkedQueue* Queue;
+ // Node* Popped;
   struct Protocol mode;// = 0;
 public:
   int getState();
@@ -153,7 +134,7 @@ public:
   void setRole(int _s, int _r);
   int getProtocol();
 
-  inline void sendStoredData(int numbers);
+  //inline void sendStoredData(int numbers);
 
   M_Device(){
     m_times=0;
@@ -173,6 +154,7 @@ public:
  * Utils
  *****************************************************************/
 extern long previousMillis_start;
+
 
 inline void addByteToPayload(uint8_t* payload_array, byte value);
 inline void addTimestampToPayload(uint8_t* payload_array, unsigned long value);

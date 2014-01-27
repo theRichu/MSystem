@@ -78,6 +78,10 @@ var frame_TEST_DRILL = {
   destination16: "0000",
   data: [DRILL_READY, 0x40, 0x02, 0x02, 0x02]
 };
+function delay()
+   {
+   setTimeout(delay, 400);
+   }
 
 
 xbeeAPI.on("frame_object", function (frame) {
@@ -247,6 +251,7 @@ io.sockets.on('connection', function (socket) {
     });
   });
 
+
   // device_sync
   socket.on('device_sync', function (data) {
     client.query('SELECT * FROM device ', function (error, data) { //WHERE use=1
@@ -262,6 +267,7 @@ io.sockets.on('connection', function (socket) {
         });
         client.query('UPDATE sync_data SET t1=? WHERE iddrill=? AND iddevice=(SELECT iddevice FROM device WHERE dest=?)', [t1, 1, data[i].dest]);
         console.log("***SEND SYNC " + i + "  " + data[i].dest + "   " + t1);
+      delay();
       }
     });
   });

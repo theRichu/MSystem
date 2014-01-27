@@ -1,5 +1,6 @@
 #include <MapleFreeRTOS.h>
 #include "m_utils.h"
+#include "PriorityQueue.h"
 #include <XBee.h>
 
 
@@ -13,24 +14,22 @@ uint8_t payload[MAX_BUFFER_NUM] = {0};
 uint8_t payload_short[5] = {0};
 uint8_t payload_broadcast[1] = {0};
 uint8_t* receivedData;
-
 uint8_t payloadPointer = 0;
 
+PriorityQueue* txQueue = PQ_Create(2);
+PQNode MinNode;
 
-long previousMillis = 0;
-long soundMillis=0;
 int old_m_times=0;
-
-//uint8_t* p_payload = payload;
-//uint8_t* p_payload_short = payload_short;
 uint8_t option = 0;
 
 volatile int sound=0;
+long soundMillis=0;
+
 volatile unsigned long sens_time=0;
 volatile int sens_state=0;
 
 
-//                XBee
+//XBee
 XBee xbee = XBee();
 
 XBeeResponse response = XBeeResponse();
@@ -46,68 +45,37 @@ void  setup()
 {
 #ifdef DEB
   SerialUSB.begin();    // For Debug
-  pinMode(BOARD_BUTTON_PIN,INPUT_PULLDOWN);
-  //attachInterrupt(BOARD_BUTTON_PIN,stateChange, FALLING);
 #endif
-  xbee.begin(9600);
 
-  LQ_CreateQueue(&m.Queue); // Records
+  xbee.begin(9600);
 
   disableDebugPorts();  // for use  11, 12, 13, 17, 18 must be used with this option
   /// input
   pinMode(LASER_SENSOR,INPUT);
-  /// output
-  pinMode(LED_RED,OUTPUT);
-  pinMode(LED_YELLOW,OUTPUT);
-  pinMode(LED_BLUE,OUTPUT);
-//  pinMode(LED_ALL_RED,OUTPUT);
-//  pinMode(LED_ALL_YELLOW,OUTPUT);
-//  pinMode(LED_ALL_BLUE,OUTPUT);
-  pinMode(PIEZO,OUTPUT);
-  
-  
-  digitalWrite(PIEZO,LOW);
-  digitalWrite(LED_RED,LOW);
-  digitalWrite(LED_YELLOW,LOW);
-  digitalWrite(LED_BLUE,LOW);
 
   attachInterrupt(LASER_SENSOR,laserCut, CHANGE);
 
-  xTaskCreate( vCommTask, ( signed char * ) "Comm", configMINIMAL_STACK_SIZE, NULL, 1, NULL );
   xTaskCreate( vProcessTask, ( signed char * ) "Proc", configMINIMAL_STACK_SIZE, NULL, 1, NULL );
-//  xTaskCreate( vPiezoTask, ( signed char * ) "Piezo", configMINIMAL_STACK_SIZE, NULL, 1, NULL );
+  xTaskCreate( vRxTask, ( signed char * ) "Rxts", configMINIMAL_STACK_SIZE, NULL, 2, NULL );
+  xTaskCreate( vTxTask, ( signed char * ) "Txts", configMINIMAL_STACK_SIZE, NULL, 2, NULL );
   vTaskStartScheduler();
 }
-
-
-
 
 void laserCut(void){
   sens_time =millis();
   sens_state = digitalRead(LASER_SENSOR);
   if(m.getState()==MEASURING)
   {
+    soundMillis =(int)millis();
     sound=1;
     if(!sens_state)   m.m_times++;
-    LQ_Enqueue(m.Queue, LQ_CreateNode(sens_state,sens_time));
+    PQ_Enqueue(txQueue, {RECORD,sens_state,sens_time});
   }
   else if(m.getState()==AFTERCOLLECTING)
   {
+    soundMillis =(int)millis();
     sound=2;
-    LQ_Enqueue(m.Queue, LQ_CreateNode((sens_state+AFTERCOLLECT_HIGH),sens_time));
-     for(int i=0;i<SENSOR_NUM;i++){
-    if(m.sensors[i]==S_LASER){
-       if (m.sensor_roles[i]==ROLE_END)
-       {
-            payloadPointer = 0;
-         //   tx_short.setOption(DISABLE_ACK_OPTION);
-            addByteToPayload(payload_broadcast,MEASURE_END);
-            xbee.send(tx_broadcast);
-            
-            m.stateEnd();
-       }
-      } 
-     }
+    PQ_Enqueue(txQueue, {RECORD,(sens_state+AFTERCOLLECT_HIGH),sens_time});
 #ifdef DEB
     SerialUSB.print("-----Laser(");
     SerialUSB.print(sens_state);
@@ -116,19 +84,15 @@ void laserCut(void){
 #endif
   }else if(m.getState()==PAUSE)
   {
-  
    for(int i=0;i<SENSOR_NUM;i++){
     if(m.sensors[i]==S_LASER){
      if(m.sensor_roles[i]==ROLE_START)
      {
+      soundMillis =(int)millis();
        sound=3;
        if(!sens_state)   m.m_times++;
-       LQ_Enqueue(m.Queue, LQ_CreateNode(sens_state,sens_time)); 
-       payloadPointer = 0;
-       //   tx_short.setOption(DISABLE_ACK_OPTION);
-       addByteToPayload(payload_broadcast,MEASURE_START);
-       xbee.send(tx_broadcast);
-       
+       PQ_Enqueue(txQueue, {SIGNAL_START,MEASURE_START,sens_time});
+       PQ_Enqueue(txQueue, {RECORD,sens_state,sens_time});    
        m.stateMeasure();
      }
     } 
@@ -144,37 +108,8 @@ void laserCut(void){
     SerialUSB.println(sens_time);
 #endif
 }
-/*
-void vPiezoTask( void *pvParameters )
-{
-  // char names[] = { 'c', 'd', 'e', 'f', 'g', 'a', 'b', 'C' };
-  //  int tones[] = { 1915, 1700, 1519, 1432, 1275, 1136, 1014, 956 };
-  for(;;)  {
-    switch(sound){
-    case 1:
-      for (long i = 0; i < 25000L; i +=  500* 2) {
-        digitalWrite(PIEZO, HIGH);
-        delayMicroseconds(500);
-        digitalWrite(PIEZO, LOW);
-        delayMicroseconds(500);
-      }
-      sound=0;
-      break;
 
-    case 2:
-      for (long i = 0; i < 20000L; i +=  800* 2) {
-        digitalWrite(PIEZO, HIGH);
-        delayMicroseconds(800);
-        digitalWrite(PIEZO, LOW);
-        delayMicroseconds(800);
-      }
-      sound=0;
-      break;
-    }
-  }
-}
-*/
-void vCommTask( void *pvParameters )
+static void vRxTask( void *pvParameters )
 {
   for( ;; )
   { 
@@ -199,41 +134,33 @@ void vCommTask( void *pvParameters )
         switch(receivedData[0]){
         case SYNC:
           {
-            payload_short={0};
-            payloadPointer = 0;
-         //   tx_short.setOption(DISABLE_ACK_OPTION);
-            addByteToPayload(payload_short,RESP);
-            xbee.send(tx_short);
-            
-          //  payload_short={0};
-            payloadPointer = 0;
-         //   tx_short.setOption(DISABLE_ACK_OPTION);
-            addByteToPayload(payload_short,0x18);
-            addTimestampToPayload(payload_short,sens_time);
+          payloadPointer = 0;   
+           addByteToPayload(payload_short,RESP);     
+           xbee.send(tx_short);
+
+          PQ_Enqueue(txQueue, {SIGNAL_DELAY_REQ,DELAY_REQ,sens_time});
+
 #ifdef DEB
     SerialUSB.print("***t2 :");
     SerialUSB.println(sens_time);
 #endif
-            delay(T_DELAY);
-            xbee.send(tx_short);
-
-            if(m.getState()==INITIAL || m.getState()==ERROR_STATE) m.stateConnected();
+          if(m.getState()==INITIAL || m.getState()==ERROR_STATE) m.stateConnected();
             break;
           }
-          
-          
+         
         case DELAY_RESP:
           {
-            payloadPointer = 0;
-            payload_short = {0};
-            addByteToPayload(payload_short,DELAY_FEEDBACK);
-            addTimestampToPayload(payload_short,millis());
-            xbee.send(tx_short);
+           payloadPointer = 0;   
+           addByteToPayload(payload_short,DELAY_FEEDBACK);   
+           addTimestampToPayload(payload_short,millis());   
+           xbee.send(tx_short);            
+//          PQ_Enqueue(txQueue, {SIGNAL_DELAY_FEEDBACK,DELAY_FEEDBACK,sens_time});
+
 #ifdef DEB
     SerialUSB.print("***t9 :");
     SerialUSB.println(millis());
 #endif
-            if(m.getState()==CONNECTED)  m.stateCalibrated();
+          if(m.getState()==CONNECTED)  m.stateCalibrated();
             break;
           }
 
@@ -244,7 +171,7 @@ void vCommTask( void *pvParameters )
             if(m.getState()==READY) m.statePause();
             break;
           }
-          
+        
         case MEASURE_START:
             m.stateMeasure();
           break;
@@ -254,22 +181,18 @@ void vCommTask( void *pvParameters )
           break;
        
         case DRILL_RESET:   
-          {       
             m.stateReset();
             break;
-          }
-   
-        
+
         default:
+
 #ifdef DEB
           SerialUSB.print("ERROR_XBEE_CODE");
 #endif
           break;
         }
-
         // TODO check option, rssi bytes    
         //        flashLed(statusLed, 1, 10);
-
       } 
       else {
         // not something we were expecting
@@ -288,22 +211,94 @@ void vCommTask( void *pvParameters )
 #endif
       // or flash error led
     } 
-
+    vTaskDelay( 50 );
   } 
 }
 
 
-
-void vProcessTask( void *pvParameters )
+static void vTxTask( void *pvParameters )
 {
-  for( ;; ){
-    if(sound)
-     if ((int)millis() - previousMillis > SOUND_LENGTH) {
-        togglePin(PIEZO);
-        previousMillis =(int)millis();
-        sound=0;
-     }
+int record_num=0;
+
+for( ;; ){
+      if(txQueue->UsedSize){
+      PQ_Dequeue(txQueue, &MinNode);
+#ifdef DEB
+      SerialUSB.print("Queued Task : ");
+      SerialUSB.println(txQueue->UsedSize);
+      SerialUSB.print("Work(");  
+      SerialUSB.print(MinNode.Priority);  
+      SerialUSB.print(") : ");  
+      SerialUSB.print(MinNode.Type);  
+      SerialUSB.print(" / ");  
+      SerialUSB.println(MinNode.Timestamp);  
+#endif
+
+      switch(MinNode.Priority){
+        case SIGNAL_RESP:
+          payload_short={ 0 };
+        case SIGNAL_DELAY_REQ:
+        case SIGNAL_DELAY_FEEDBACK:
+        case SIGNAL:
+          //Short
+           payloadPointer = 0;   
+           addByteToPayload(payload_short,MinNode.Type);     
+           addTimestampToPayload(payload_short,MinNode.Timestamp);
+           xbee.send(tx_short);
+        break;
+
+        case SIGNAL_START:
+        case SIGNAL_END:        
+          //Broadcast
+            payloadPointer = 0;
+         //   tx_short.setOption(DISABLE_ACK_OPTION);
+            addByteToPayload(payload_broadcast,MinNode.Type);
+            xbee.send(tx_broadcast);
+        break;
+
+        case RECORD:
+          payload={0};
+          payloadPointer=0;
+          addByteToPayload(payload,MEASURE_OK);     
+          addByteToPayload(payload,0x01);       
+          addByteToPayload(payload,MinNode.Type);     
+          addTimestampToPayload(payload,MinNode.Timestamp);
+          xbee.send(tx);            
+        break;
+
+      }
+}
+
+      
+      vTaskDelay( 50 );
+}
+}
+
+      
+static void vProcessTask( void *pvParameters )
+{
+    /// output
+  pinMode(LED_RED,OUTPUT);
+  pinMode(LED_YELLOW,OUTPUT);
+  pinMode(LED_BLUE,OUTPUT);
+  pinMode(PIEZO,OUTPUT);
     
+  digitalWrite(PIEZO,LOW);
+  digitalWrite(LED_RED,LOW);
+  digitalWrite(LED_YELLOW,LOW);
+  digitalWrite(LED_BLUE,LOW);
+
+  long previousMillis = 0;
+
+  for( ;; ){
+    if(sound){
+      digitalWrite(PIEZO,HIGH);
+      if ((int)millis() - soundMillis > SOUND_LENGTH) {
+        sound=0;     
+        digitalWrite(PIEZO,LOW);
+      }
+     }
+
     switch(m.getState())
     {
     case INITIAL:
@@ -358,20 +353,18 @@ void vProcessTask( void *pvParameters )
           if(m.m_times<m.mode.repeat_num){
             if(m.mode.delay_time){        
               m.stateWait();                
-            }
-            else  { 
-             while(m.Queue->Count){
-               #ifdef DEB
-                SerialUSB.print("Stacked COUNT: ");
-                SerialUSB.println(m.Queue->Count);
-              #endif
-              m.sendStoredData(6);
-              }
+            }else{ 
               m.stateMeasure() ;
             }
-
           }
           else {
+            for(int i=0;i<SENSOR_NUM;i++){
+              if(m.sensors[i]==S_LASER){
+                if(m.sensor_roles[i]==ROLE_END){
+                   PQ_Enqueue(txQueue, {SIGNAL_END,MEASURE_END,sens_time});
+                }
+               }
+             }
             m.stateFinish();
           }
         }
@@ -386,18 +379,6 @@ void vProcessTask( void *pvParameters )
 
       if ((int)millis() - previousMillis_start > (m.mode.delay_time*100)) {
         if(digitalRead(LASER_SENSOR)) m.stateMeasure();
-      }  
-      else{
-        if ((int)millis() - previousMillis > 100) {
-          if(m.Queue->Count){
-#ifdef DEB
-            SerialUSB.print("Stacked COUNT: ");
-            SerialUSB.println(m.Queue->Count);
-#endif
-            m.sendStoredData(6);
-          }      
-          previousMillis =(int)millis();
-        }    
       }
       break;
       
@@ -427,53 +408,18 @@ void vProcessTask( void *pvParameters )
            }
           } 
          }
-         
-        if ((int)millis() - previousMillis > 100) {
-          if(m.Queue->Count){
-#ifdef DEB
-            SerialUSB.print("Stacked COUNT: ");
-            SerialUSB.println(m.Queue->Count);
-#endif
-            m.sendStoredData(6);
-          }      
-          previousMillis =(int)millis();
-        }    
-
       break;      
-   
 
     case FINISHED:
       digitalWrite(LED_YELLOW,LOW);
       digitalWrite(LED_BLUE,LOW);
       digitalWrite(LED_RED,LOW);
-
-      if ((int)millis() - previousMillis > 100) {
-        if(m.Queue->Count){
-#ifdef DEB
-          SerialUSB.print("Stacked COUNT: ");
-          SerialUSB.println(m.Queue->Count);
-#endif
-          m.sendStoredData(6);
-        }      
-        previousMillis =(int)millis();
-      }    
       break;
     
     case END:
       digitalWrite(LED_YELLOW,LOW);
       digitalWrite(LED_BLUE,LOW);
       digitalWrite(LED_RED,HIGH);
-
-      if ((int)millis() - previousMillis > 100) {
-        if(m.Queue->Count){
-#ifdef DEB
-          SerialUSB.print("Stacked COUNT: ");
-          SerialUSB.println(m.Queue->Count);
-#endif
-          m.sendStoredData(6);
-        }      
-        previousMillis =(int)millis();
-      }    
       break;
 
     case ERROR_STATE:
@@ -485,10 +431,12 @@ void vProcessTask( void *pvParameters )
         previousMillis =(int)millis();
       }      
       break;
+
     default:
 
       break; 
     }
+    vTaskDelay( 50 );
   }
 }
 
@@ -499,36 +447,6 @@ void  loop()
 
 }
 
-
-
-inline void M_Device::sendStoredData(int numbers){
-  //tx.setOption(DISABLE_ACK_OPTION);
-  payloadPointer = 0;
-  payload={ 0 };
-
-  int num = (Queue->Count<numbers)?Queue->Count:numbers;
-  addByteToPayload(payload,MEASURE_OK);
-  addByteToPayload(payload,num);
-  for(int i=0;i<num;i++)
-  {
-    Popped = LQ_Dequeue(Queue);
-    byte data = Popped->Data + S_LASER+5;
-    addByteToPayload(payload,data); //
-    addTimestampToPayload(payload,Popped->Timestamp);
-    LQ_DestoryNode(Popped);
-  }
-#ifdef DEB
-  SerialUSB.print(payload[0]);
-  SerialUSB.println(": data");
-#endif
-
-  xbee.send(tx);
-
-#ifdef DEB
-  SerialUSB.print(num);
-  SerialUSB.println(" SEND");
-#endif
-}
 
 inline void addByteToPayload(uint8_t* payload_array,  byte value){
   *(payload_array+(payloadPointer++))=value;
