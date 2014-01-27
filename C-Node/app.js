@@ -270,6 +270,11 @@ io.sockets.on('connection', function (socket) {
       delay();
       }
     });
+
+    client.query('SELECT * FROM drill', function (err, data){
+      io.sockets.emit('drill_receive', data);
+    });    
+
   });
 
 
