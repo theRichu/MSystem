@@ -6,6 +6,7 @@
 
 ////DEBUG
 //#define DEB
+#define VER2
 
 ////////////////INTERNAL/////////////////////
 ///States
@@ -81,16 +82,18 @@
 
 //pins
 #define LASER_SENSOR        8   //PCB PRINT 8
+#define PIEZO               13  // PCB PRINT 13
+
+#ifdef VER2
+#define LED_PIN             11
+#else
 #define LED_RED             10  // PCB PRINT 10
 #define LED_YELLOW          11  // PCB PRINT 11
 #define LED_BLUE            12  // PCB PRINT 12
-#define PIEZO               13  // PCB PRINT 13
-#define LED_ALL_RED         17  // PCB PRINT 15
-#define LED_ALL_YELLOW      18  // PCB PRINT 16
-#define LED_ALL_BLUE        19  // PCB PRINT 17
-
+#endif
 
 #define BLINK_DELAY         500
+#define LED_CYCLE_DELAY     100
 #define SENSOR_NUM          1
 #define MAX_BUFFER_NUM      7
 
@@ -101,51 +104,98 @@
 #define NULL 0
 #endif
 
-struct Protocol{
-  int code;
-  int repeat_num;
-  int delay_time;
-  int aftercollecting_time;
+
+
+
+#ifdef VER2
+//////////////////////LED/////////////////////////////
+#define kSpinCountZeroBitHigh 4   // these give 330ns high and 800ns low
+#define kSpinCountZeroBitLow  9
+#define kSpinCountOneBitHigh  9  // these give 750 high and 360 low
+#define kSpinCountOneBitLow   4
+
+#define LED_EACH_NUM 3
+#define kNumLEDs ((LED_EACH_NUM)*3)
+
+
+static inline void spinDelay(uint32) __attribute__((always_inline, unused));
+static inline void spinDelay(uint32 count)
+{
+    asm volatile(
+        "L_%=_loop:\n\t"
+        "subs %0, #1\n\t"
+        "bne  L_%=_loop\n"
+        : "+r" (count) :
+    );
+}
+// WS2812 chip - NeoPixel, etc.
+#endif
+
+
+struct Protocol
+{
+    int code;
+    int repeat_num;
+    int delay_time;
+    int aftercollecting_time;
 };
 
-class M_Device{
+class M_Device
+{
 private:
-  int state;// = INITIAL;  // state variable controls state machine
-public:
-  int sensors[SENSOR_NUM];// = {S_LASER};
-  int sensor_roles[SENSOR_NUM];
-  int m_times;
- // Node* Popped;
-  struct Protocol mode;// = 0;
-public:
-  int getState();
-  void stateAftercollect();
-  void stateFinish();
-  void stateError();
-  void stateCalibrated();
-  void stateConnected();
-  void stateMeasure();
-  void stateReset();
-  void stateWait();
-  void statePause();
-  void stateEnd();
-  
-  void setProtocol(int _p, int _r, int _d, int _a);
-  void setRole(int _s, int _r);
-  int getProtocol();
+    int state;// = INITIAL;  // state variable controls state machine
 
-  //inline void sendStoredData(int numbers);
+#ifdef VER2
+    int led_direction;
+#endif
 
-  M_Device(){
-    m_times=0;
-    state=INITIAL;
-    mode.code=P_UNDEFINED;
-    mode.repeat_num=0;
-    mode.delay_time=0;
-    mode.aftercollecting_time=2;
-    sensors[0] = S_LASER;
-    sensor_roles[0] = ROLE_NORMAL;
-  }
+public:
+    int sensors[SENSOR_NUM];// = {S_LASER};
+    int sensor_roles[SENSOR_NUM];
+    int m_times;
+    // Node* Popped;
+    struct Protocol mode;// = 0;
+public:
+
+#ifdef VER2
+    int getLEDDirection();
+    void setLEDDirection(int _d);
+#endif
+
+    int getState();
+    void stateAftercollect();
+    void stateFinish();
+    void stateError();
+    void stateCalibrated();
+    void stateConnected();
+    void stateMeasure();
+    void stateReset();
+    void stateWait();
+    void statePause();
+    void stateEnd();
+
+    void setProtocol(int _p, int _r, int _d, int _a);
+    void setRole(int _s, int _r);
+    int getProtocol();
+
+    //inline void sendStoredData(int numbers);
+
+    M_Device()
+    {
+        m_times = 0;
+        state = INITIAL;
+        mode.code = P_UNDEFINED;
+        mode.repeat_num = 0;
+        mode.delay_time = 0;
+        mode.aftercollecting_time = 2;
+        sensors[0] = S_LASER;
+        sensor_roles[0] = ROLE_NORMAL;
+
+#ifdef VER2
+        led_direction = 0;
+#endif
+
+    }
 
 };
 
@@ -156,10 +206,72 @@ public:
 extern long previousMillis_start;
 
 
-inline void addByteToPayload(uint8_t* payload_array, byte value);
-inline void addTimestampToPayload(uint8_t* payload_array, unsigned long value);
-inline void addFloatToPayload(uint8_t* payload_array, float value);
+inline void addByteToPayload(uint8_t *payload_array, byte value);
+inline void addTimestampToPayload(uint8_t *payload_array, unsigned long value);
+inline void addFloatToPayload(uint8_t *payload_array, float value);
+
+
+#ifdef VER2
+
+void present(byte *rgb /* = NULL */);
+
+extern byte led_black[3 * (kNumLEDs)];
+extern byte led_r[][3 * (kNumLEDs)];
+extern byte led_y[][3 * (kNumLEDs)];
+extern byte led_g[][3 * (kNumLEDs)];
+extern byte led_ry[][3 * (kNumLEDs)];
+extern byte led_rg[][3 * (kNumLEDs)];
+extern byte led_yg[][3 * (kNumLEDs)] ;
+extern byte led_all[][3 * (kNumLEDs)];
+
+
+
+inline void led_all_blink()
+{
+    static int a = 0;
+    present(led_all[a++]);
+    if (a == 4) a = 0;
+}
+inline void led_r_blink()
+{
+    static int r = 0;
+    present(led_r[r++]);
+    if (r == LED_EACH_NUM + 1) r = 0;
+}
+inline void led_g_blink()
+{
+    static int g = 0;
+    present(led_g[g++]);
+    if (g == LED_EACH_NUM + 1) g = 0;
+}
+inline void led_y_blink()
+{
+    static int y = 0;
+    present(led_y[y++]);
+    if (y == LED_EACH_NUM + 1) y = 0;
+}
+inline void led_ry_blink()
+{
+    static int ry = 0;
+    present(led_ry[ry++]);
+    if (ry == LED_EACH_NUM + 1) ry = 0;
+}
+inline void led_rg_blink()
+{
+    static int rg = 0;
+    present(led_rg[rg++]);
+    if (rg == LED_EACH_NUM + 1) rg = 0;
+}
+inline void led_yg_blink()
+{
+    static int yg = 0;
+    present(led_yg[yg++]);
+    if (yg == LED_EACH_NUM + 1) yg = 0;
+}
+
+
+
 
 #endif
 
-
+#endif
